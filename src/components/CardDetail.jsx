@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useAuth0 } from "@auth0/auth0-react";
 import "./CardMenu.css";
@@ -12,6 +12,7 @@ import {
   deleteFavorite,
   deleteReading,
   deleteReaded,
+  getCurrentUser,
 } from "../redux/actions";
 
 import {
@@ -56,9 +57,11 @@ import starFill from "../icons/starFill.svg";
 import starHalf from "../icons/starHalf.svg";
 import closeIcon from "../icons/closeIcon.svg";
 import bookIcon from "../icons/bookIcon.svg";
-import bookHalfIcon from "../icons/bookHalfIcon.svg"
+import bookHalfIcon from "../icons/bookHalfIcon.svg";
 import { StarsContainer } from "../styles/CardRecomended";
-import BookReviews from "../components/BookReviews.jsx"
+import BookReviews from "../components/BookReviews.jsx";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function DropdownItem(props) {
   return (
@@ -76,80 +79,109 @@ function DropdownItem(props) {
 
 export default function CardDetail({ book, modal, setModal }) {
   const dispatch = useDispatch();
-
+  const [arrayFavorite, setArrayFavorite] = useState([]);
+  const [arrayReaded, setArrayReaded] = useState([]);
+  const [arrayReading, setArrayReading] = useState([]);
   const currentUser = useSelector((state) => state.currentUser);
 
   const [open, setOpen] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [readed, setReaded] = useState(false);
   const [reading, setReading] = useState(false);
-  const [newReview, setNewReview]=useState(false);
+  const [newReview, setNewReview] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const { isAuthenticated, user, isLoading } = useAuth0();
 
+  const userId = { userId: currentUser && currentUser.id };
 
-  // const bookId = props.match.params.id;
-  // console.log("BOOK ID:", bookId);
-  // console.log("PROPS",props)
-  const userId={userId:currentUser && currentUser.id};
+  const handleMouseOver = () => {
+    setIsHovering(true);
+  };
 
-  
-  // userId && console.log("USERID",userId)
-
-  // const book = useSelector((state) => state.detail);
-
-  // useEffect(() => {
-  //   dispatch(bookDetail(book.id));
-
-  //   return () => {
-  //     console.log("Detail Clean Up");
-  //     dispatch(cleanBookDetail());
-  //   };
-  // }, [dispatch]);
+  const handleMouseOut = () => {
+    setIsHovering(false);
+  };
 
   function handleCloseClick(e) {
     e.preventDefault(e);
     setModal(false);
     setNewReview(false);
-    console.log("MODAL",modal)
+    console.log("MODAL", modal);
     console.log("e.target.value", e.target.value);
     dispatch(cleanBookDetail(e.target.value));
   }
   function handleReviewClick(e) {
     e.preventDefault(e);
     setNewReview(true);
-    console.log("newReview", newReview)
+    console.log("newReview", newReview);
     console.log("e.target.value", e.target.value);
   }
 
   function handleFavorite(id, userId) {
     // e.preventDefault();
     // console.log("e.target.value",e.target.value)
-    console.log("Entré a favorite:", id);
+
     if (!favorite) {
-      setFavorite(!favorite);
+      console.log("Entré a add favorite, bookId:", id);
+      setFavorite(true);
       console.log("FAV+", favorite);
       dispatch(addFavorite(id, userId));
+      toast.success("Book added to your favorites");
     }
+
     if (favorite) {
-      setFavorite(!favorite);
+      console.log("Entré a delete favorite, bookId:", id);
+      setFavorite(false);
       console.log("FAV-", favorite);
+
       dispatch(deleteFavorite(id, userId));
+
+      toast.warning("Book removed from your favorites");
     }
   }
 
   function handleReaded(id, userId) {
-    // e.preventDefault();
     // console.log("e.target.value",e.target.value)
-    console.log("Entré a readed:", id);
+
     if (!readed) {
-      setReaded(!readed);
+      console.log("Entré a add readed :", id);
+      setReaded(true);
       console.log("READ+", readed);
+
       dispatch(addReaded(id, userId));
+      toast.success("Book mark as readed");
     }
+
     if (readed) {
-      setReaded(!readed);
+      console.log("Entré a delete readed :", id);
+      setReaded(false);
       console.log("READ-", readed);
+
       dispatch(deleteReaded(id, userId));
+      toast.warning("Book mark as unread");
+    }
+  }
+
+  function handleReading(id, userId) {
+    // console.log("e.target.value",e.target.value)
+
+    if (!reading) {
+      console.log("Entré a add reading :", id);
+      setReading(true);
+      console.log("READ+", reading);
+
+      dispatch(addReading(id, userId));
+
+      toast.success("Book mark as reading");
+    }
+
+    if (reading) {
+      console.log("Entré a delete reading :", id);
+      setReading(false);
+      console.log("READ-", reading);
+
+      dispatch(deleteReading(id, userId));
+      toast.warning("Book mark as unreading");
     }
   }
 
@@ -167,27 +199,7 @@ export default function CardDetail({ book, modal, setModal }) {
     }
     return stars;
   }
-  function handleReading(id, userId) {
-    
-    // console.log("e.target.value",e.target.value)
-    
-    if(!reading){
-      console.log("Entré a add reading :", id);
-      setReading(!reading)
-      console.log("READ+",reading)
-      
-      dispatch(addReading(id, userId));
-      
-    }
-    if(reading){
-      console.log("Entré a delete reading :", id);
-      setReading(!reading)
-      console.log("READ-",reading)
-      dispatch(deleteReading(id, userId));
-      
-    }
-    
-  }
+
   var starAverage =
     book && book.averageRating && starRating(book.averageRating);
 
@@ -203,12 +215,93 @@ export default function CardDetail({ book, modal, setModal }) {
     book.reviews[1] &&
     starRating(book.reviews[1].score);
 
+  // carga los favs
+  useEffect(() => {
+    if (currentUser && modal) {
+      const userFavorites = currentUser.Favorites;
+
+      // console.log("USER FAVORITES",userFavorites)
+
+      let allFavorites = [];
+
+      for (let i = 0; i < currentUser.Favorites.length; i++) {
+        let fav = currentUser.Favorites[i].id;
+
+        allFavorites.push(fav);
+      }
+      setArrayFavorite(allFavorites);
+    }
+  }, [dispatch, currentUser, book]);
+  //  console.log("Array FAVORITE",arrayFavorite)
+
+  // carga los readed
+  useEffect(() => {
+    if (currentUser && modal) {
+      const userReaded = currentUser.Read;
+
+      let allReaded = [];
+
+      for (let i = 0; i < currentUser.Read.length; i++) {
+        let read = currentUser.Read[i].id;
+        allReaded.push(read);
+      }
+      setArrayReaded(allReaded);
+    }
+  }, [dispatch, currentUser, book]);
+  //  console.log("Array READED",arrayReaded)
+
+  // carga los reading
+  useEffect(() => {
+    if (currentUser && modal) {
+      const userReading = currentUser.Reading;
+      let allReading = [];
+
+      for (let i = 0; i < currentUser.Reading.length; i++) {
+        let reading = currentUser.Reading[i].id;
+        allReading.push(reading);
+      }
+      setArrayReading(allReading);
+    }
+  }, [dispatch, currentUser, book]);
+
+  useEffect(() => {
+    if (arrayFavorite.includes(book.id)) {
+      setFavorite(true);
+      // console.log("SETIE EL FAV", true)
+    } else if (!arrayFavorite.includes(book.id)) {
+      // console.log("FAV-", false)
+      setFavorite(false);
+      // console.log("SETIE EL FAV",false)
+    }
+  }, [dispatch, arrayFavorite, book.id]);
+
+  useEffect(() => {
+    if (arrayReaded.includes(book.id)) {
+      setReaded(true);
+      // console.log("SETIE EL Readed", true)
+    } else if (!arrayReaded.includes(book.id)) {
+      // console.log("Readed-", false)
+      setReaded(false);
+      // console.log("SETIE EL READED",false)
+    }
+  }, [dispatch, arrayReaded, book.id]);
+
+  useEffect(() => {
+    if (arrayReading.includes(book.id)) {
+      setReading(true);
+      // console.log("SETIE EL Reading", true)
+    } else if (!arrayReading.includes(book.id)) {
+      // console.log("Reading-", false)
+      setReading(false);
+      // console.log("SETIE EL READING",false)
+    }
+  }, [dispatch, arrayReading, book.id]);
+
   return (
     <>
       {modal && (
         <OverLay>
           <SingleCardContainerDetail>
-           
             <ImgAndInfo>
               <ImgContainerDetail>
                 <CardImgDetail src={book.cover} alt="img not found" />
@@ -222,24 +315,33 @@ export default function CardDetail({ book, modal, setModal }) {
                 >
                   <img src={closeIcon} alt="n" />
                 </ButtonCloseDetail>
-                <MenuConteiner right={"310px"} top={"120px"}>
-                  <MenuTrigger
-                    onClick={() => {
-                      setOpen(!open);
-                    }}
-                  >
+                <MenuConteiner
+                  right={"310px"}
+                  top={"120px"}
+                  onMouseOver={handleMouseOver}
+                  onMouseOut={handleMouseOut}
+                >
+                  <MenuTrigger onMouseOver={handleMouseOver}>
                     <img src={caretIcon} />
                   </MenuTrigger>
                   <DropDownMenu
-                    className={`dropdown-menu ${open ? "active" : "inactive"}`}
+                    className={`dropdown-menu ${
+                      isHovering ? "active" : "inactive"
+                    }`}
+                    onMouseOver={handleMouseOver}
                   >
                     <UlCard>
-                      {/* <DropdownItem
-                        icon={reviewIcon}
-                        value={book.id}
-                        role="button"
-                      /> */}
                       <DropdownItem
+                        key={book.id + "1"}
+                        icon={!reading ? bookIcon : bookHalfIcon}
+                        value={book.id}
+                        handle={(e) => {
+                          handleReading(book.id, userId);
+                        }}
+                        role="button"
+                      />
+                      <DropdownItem
+                        key={book.id + "2"}
                         icon={!readed ? readedIcon : readedIconFill}
                         value={book.id}
                         handle={(e) => {
@@ -248,17 +350,15 @@ export default function CardDetail({ book, modal, setModal }) {
                         role="button"
                       />
                       <DropdownItem
+                        key={book.id + "3"}
                         icon={!favorite ? favoriteIcon : favoriteFillIcon}
                         value={book.id}
+                        name={book.title}
                         handle={(e) => {
                           handleFavorite(book.id, userId);
                         }}
                         role="button"
                       />
-                      <DropdownItem 
-                      icon={!reading?bookIcon:bookHalfIcon} 
-                      value={book.id} 
-                      handle={e=>{handleReading(book.id,userId)}}role="button" />
                     </UlCard>
                   </DropDownMenu>
                 </MenuConteiner>
@@ -279,9 +379,9 @@ export default function CardDetail({ book, modal, setModal }) {
                 </TitleAndRating>
                 <SubtitleAndYear>
                   <H2Detail>
-                    { book.subtitle ? 
-                      book.subtitle : `Author: ${book && book.author && book.author.name}`
-                    }
+                    {book.subtitle
+                      ? book.subtitle
+                      : `Author: ${book && book.author && book.author.name}`}
                   </H2Detail>
                   <H2Detail>Year: {book.publishedDate}</H2Detail>
                 </SubtitleAndYear>
@@ -297,67 +397,36 @@ export default function CardDetail({ book, modal, setModal }) {
               </ColumnConteinerDetail>
             </ImgAndInfo>
             <ReviewConteiner>
-            { book && book.reviews && <BookReviews/> }
+              {book && book.reviews && <BookReviews />}
             </ReviewConteiner>
-           
-            {/* <ReviewConteiner>
-            
-              {book && book.reviews && book.reviews[0] ? (
-                <>
-                  <UserAndStars>
-                    <H4Detail>
-                      Review by {book.reviews[1].user.userName}
-                    </H4Detail>
 
-                    <StarsContainer>
-                      {review1Star &&
-                        review1Star.map((s) =>
-                          s === "star" ? (
-                            <StarDetail src={starFill} alt="n" />
-                          ) : (
-                            <StarDetail src={starHalf} alt="n" />
-                          )
-                        )}
-                    </StarsContainer>
-                  </UserAndStars>
-                  <H5Detail>{book.reviews[0].comment}</H5Detail>
-                </>
+            {currentUser && currentUser.subscription ? (
+              !newReview ? (
+                <ButtonsConteiner>
+                  {/* <ButtonDetail>Show More Reviews</ButtonDetail> */}
+                  <ButtonDetail
+                    onClick={(e) => {
+                      handleReviewClick(e);
+                    }}
+                  >
+                    Leave a Review
+                  </ButtonDetail>
+                </ButtonsConteiner>
               ) : (
-                <div>
-                  <H4Detail>
-                    There are no reviews for this book yet, be the first to
-                    write one.
-                  </H4Detail>
-                </div>
-              )}
-            </ReviewConteiner>
-            {book && book.reviews && book.reviews[1] ? (
-              <ReviewConteiner>
-                <UserAndStars>
-                  <H4Detail>Review by {book.reviews[1].user.userName}</H4Detail>
-                  <StarsContainer>
-                    {review2Star &&
-                      review2Star.map((s) =>
-                        s === "star" ? (
-                          <StarDetail src={starFill} alt="n" />
-                        ) : (
-                          <StarDetail src={starHalf} alt="n" />
-                        )
-                      )}
-                  </StarsContainer>
-                </UserAndStars>
-
-                <H5Detail>{book.reviews[1].comment}</H5Detail>
-              </ReviewConteiner>
-            ) : <></> } */}
-            {!newReview ?<ButtonsConteiner>
-              {/* <ButtonDetail>Show More Reviews</ButtonDetail> */}
-              <ButtonDetail  onClick={(e) => {handleReviewClick(e)}}>Leave a Review</ButtonDetail>
-            </ButtonsConteiner>
-            : <ReviewConteiner>
-            <CreateReview currentUser={currentUser} book={book} setNewReview={setNewReview} newReview={newReview} modal={modal} setModal={setModal}/>
-            </ReviewConteiner>}
-            
+                <ReviewConteiner>
+                  <CreateReview
+                    currentUser={currentUser}
+                    book={book}
+                    setNewReview={setNewReview}
+                    newReview={newReview}
+                    modal={modal}
+                    setModal={setModal}
+                  />
+                </ReviewConteiner>
+              )
+            ) : (
+              <div>Subscribe to review</div>
+            )}
           </SingleCardContainerDetail>
         </OverLay>
       )}
